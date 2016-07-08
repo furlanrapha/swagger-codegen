@@ -4,28 +4,28 @@ using System.Linq;
 using System.Text;
 using System.Threading.Tasks;
 
-namespace SwaggerCodeGenerator
+namespace SwaggerCodegen.Structure
 {
     public class ViewModelClass
     {
         public ViewModelClass()
         {
-            this.Attributes = new Dictionary<string, string>();
+            this.Properties = new List<ViewModelProperty>();
         }
 
         public string NameOfClass { get; set; }
 
-        public Dictionary<string, string> Attributes { get; set; }
+        public List<ViewModelProperty> Properties { get; set; }
 
         public override string ToString()
         {
             StringBuilder result = new StringBuilder();
                 
-            result.AppendLine("> CLASS NAME - " + NameOfClass);
+            result.AppendLine("> VIEW MODEL NAME - " + NameOfClass);
 
-            foreach (var item in Attributes)
+            foreach (var item in Properties)
             {
-                result.AppendLine("+ " + item.Value + " : " + item.Key);
+                result.AppendLine("+ " + item.Type + " : " + item.Name);
             }
 
             return result.ToString();
