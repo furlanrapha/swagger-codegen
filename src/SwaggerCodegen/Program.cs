@@ -19,7 +19,38 @@ namespace SwaggerCodegen
                 ClientNameSpace = "Kondominio.Web.API",
                 FolderPath = @"C:\TEMP_SWAGGER\"
             };
-            
+
+            Console.WriteLine("--- GETTING THE CONFIGURATION FROM THE USER");
+
+            string inputFromUser = "";
+
+            Console.WriteLine("> ENTER THE API URL: (EXAMPLE: \"http://api.yourwebsite.com/swagger/docs/v1\")");
+            inputFromUser = Console.ReadLine();
+
+            if (!string.IsNullOrWhiteSpace(inputFromUser))
+                config.APIUrl = inputFromUser;
+
+            Console.WriteLine("> ENTER THE API NAMESPACE: (EXAMPLE: \"ExampleNameSpace\")");
+            inputFromUser = Console.ReadLine();
+
+            if (!string.IsNullOrWhiteSpace(inputFromUser))
+                config.APINameSpace = inputFromUser;
+
+            Console.WriteLine("> ENTER THE CLIENT NAMESPACE: (EXAMPLE: \"ExampleNameSpace.Web.MyClientAPI\")");
+            inputFromUser = Console.ReadLine();
+
+            if (!string.IsNullOrWhiteSpace(inputFromUser))
+                config.ClientNameSpace = inputFromUser;
+
+            Console.WriteLine("> ENTER THE FOLDER: (EXAMPLE: \"C:\\TEMP_SWAGGER\\\")");
+            inputFromUser = Console.ReadLine();
+
+            if (!string.IsNullOrWhiteSpace(inputFromUser))
+                config.FolderPath = inputFromUser;
+
+            Console.WriteLine("--- CONFIGURATION INSERTED");
+            Console.WriteLine(config.ToString());
+
             Console.WriteLine("--- GETTING THE JSON FILE FROM SWAGGER");
 
             JObject swaggerJsonFile = GetSwaggerJsonFile(config.APIUrl);
