@@ -1,4 +1,6 @@
-﻿using Newtonsoft.Json.Linq;
+﻿using Newtonsoft.Json;
+using Newtonsoft.Json.Linq;
+using SwaggerCodegen.SwaggerStructure;
 using System;
 using System.Collections.Generic;
 using System.IO;
@@ -53,7 +55,7 @@ namespace SwaggerCodegen
 
             Console.WriteLine("--- GETTING THE JSON FILE FROM SWAGGER");
 
-            JObject swaggerJsonFile = GetSwaggerJsonFile(config.APIUrl);
+            SwaggerObject swaggerObject = GetSwaggerObject(config.APIUrl);
 
             Console.WriteLine("- JSON File Loaded");
 
@@ -61,7 +63,7 @@ namespace SwaggerCodegen
 
             DateTime executionDateTime = DateTime.Now;
             
-            var services = SwaggerReader.ReadServices(swaggerJsonFile);
+            var services = SwaggerReader.ReadServices(swaggerObject);
 
             Console.WriteLine("> SERVICES (Quantity: " + services.Count + ")");
             Console.WriteLine("");
@@ -79,7 +81,7 @@ namespace SwaggerCodegen
 
             executionDateTime = DateTime.Now;
 
-            var viewModels = SwaggerReader.ReadViewModels(swaggerJsonFile, config.APINameSpace, config.ClientNameSpace);
+            var viewModels = SwaggerReader.ReadViewModels(swaggerObject, config.APINameSpace, config.ClientNameSpace);
             
             Console.WriteLine("> VIEW MODELS (Quantity: " + viewModels.Count + ")");
             Console.WriteLine("");
@@ -126,7 +128,7 @@ namespace SwaggerCodegen
             }
         }
 
-        private static JObject GetSwaggerJsonFile(string APIUrl)
+        private static SwaggerObject GetSwaggerObject(string APIUrl)
         {
             WebRequest request = WebRequest.Create(APIUrl);
 
@@ -134,10 +136,15 @@ namespace SwaggerCodegen
             
             var responseReader = new StreamReader(response.GetResponseStream());
             var responseData = responseReader.ReadToEndAsync().Result;
-            
-            JObject swaggerJsonFile = JObject.Parse(responseData);
 
-            return swaggerJsonFile;
+            var swaggerObject = JsonConvert.DeserializeObject<SwaggerObject>(responseData, new JsonSerializerSettings
+            {
+                PreserveReferencesHandling = PreserveReferencesHandling.All,
+                ReferenceLoopHandling = ReferenceLoopHandling.Serialize,
+                MetadataPropertyHandling = MetadataPropertyHandling.Ignore
+            });
+
+            return swaggerObject;
         }
     }
 }
