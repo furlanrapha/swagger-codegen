@@ -90,54 +90,36 @@ namespace SwaggerCodegen
             return serviceMethod;
         }
 
-        public static List<ViewModelClass> ReadViewModels(JObject swaggerJsonFile, string apiNameSpace, string clientNameSpace)
+        public static List<ViewModelClass> ReadViewModels(SwaggerObject swaggerObject, string apiNameSpace, string clientNameSpace)
         {
             List<ViewModelClass> viewModelList = new List<ViewModelClass>();
 
-            foreach (var definition in swaggerJsonFile.SelectToken("definitions").ToObject<JObject>())
+            foreach (var definition in swaggerObject.definitions)
             {
                 ViewModelClass viewModelClass = new ViewModelClass();
+                
+                viewModelClass.NameOfClass = TranslateNameSpace(definition.Key, apiNameSpace, clientNameSpace);
 
-                string nameOfTheClass = definition.Key.Replace(apiNameSpace, clientNameSpace);
-
-                viewModelClass.NameOfClass = nameOfTheClass;
-
-                foreach (var property in definition.Value.SelectToken("properties").ToObject<JObject>())
+                foreach (var property in definition.Value.properties)
                 {
-                    string CSharpType = "string";
-
-                    var propertyType = property.Value.SelectToken("type");
-
-                    if (propertyType == null)
+                    string CSharpType;
+                    
+                    if (property.Value.type == null)
                     {
-                        var propertyRef = property.Value.SelectToken("$ref").ToObject<string>();
+                        // Swagger works with JSON Pointer for $ref
+                        string jsonPointer = "#/definitions/";
 
-                        CSharpType = propertyRef.Replace("#/definitions/", "");
+                        CSharpType = TranslateNameSpace(property.Value._ref.Substring(jsonPointer.Length), apiNameSpace, clientNameSpace);
                     }
                     else
                     {
-                        var propertyFormat = property.Value.SelectToken("format");
-
-                        if (propertyFormat == null)
+                        if (property.Value.format == null)
                         {
-                            CSharpType = propertyType.ToObject<string>();
+                            CSharpType = property.Value.type;
                         }
                         else
                         {
-                            var format = propertyFormat.ToObject<string>();
-
-                            if (format.Equals("int32"))
-                            {
-                                CSharpType = "int";
-                            }
-                            else if (format.Equals("double"))
-                            {
-                                CSharpType = "decimal";
-                            }
-                            else if (format.Equals("date-time"))
-                            {
-                                CSharpType = "DateTime";
-                            }
+                            CSharpType = TranslateFormat(property.Value.format);
                         }
                     }
 
@@ -152,6 +134,74 @@ namespace SwaggerCodegen
             }
 
             return viewModelList;
+        }
+
+        /// <summary>
+        /// Translates the full class name using the api and client namespace to make a replace
+        /// </summary>
+        /// <param name="fullClassName">The full namespace plus the class name</param>
+        /// <param name="apiNameSpace">The API namespace</param>
+        /// <param name="clientNameSpace">The Client namespace</param>
+        /// <returns>The translated full class name</returns>
+        private static string TranslateNameSpace(string fullClassName, string apiNameSpace, string clientNameSpace)
+        {
+            if (!fullClassName.StartsWith(apiNameSpace))
+            {
+                return fullClassName;
+            }
+            else
+            {
+                return clientNameSpace + fullClassName.Substring(apiNameSpace.Length);
+            }
+        }
+
+        /// <summary>
+        /// Translates the format from Swagger to a C# format
+        /// </summary>
+        /// <param name="format">The format from Swagger</param>
+        /// <returns>The C# format</returns>
+        private static string TranslateFormat(string format)
+        {
+            if (format.Equals("int32"))
+            {
+                return "int";
+            }
+            else if (format.Equals("int64"))
+            {
+                return "int";
+            }
+            else if (format.Equals("float"))
+            {
+                return "float";
+            }
+            else if (format.Equals("double"))
+            {
+                return "double";
+            }
+            else if (format.Equals("byte"))
+            {
+                return "byte";
+            }
+            else if (format.Equals("binary"))
+            {
+                return "byte[]";
+            }
+            else if (format.Equals("date"))
+            {
+                return "DateTime";
+            }
+            else if (format.Equals("date-time"))
+            {
+                return "DateTime";
+            }
+            else if (format.Equals("password"))
+            {
+                return "string";
+            }
+            else
+            {
+                return "string";
+            }
         }
     }
 }
