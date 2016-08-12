@@ -63,7 +63,7 @@ namespace SwaggerCodegen
 
             DateTime executionDateTime = DateTime.Now;
             
-            var services = SwaggerReader.ReadServices(swaggerObject);
+            var services = SwaggerReader.ReadServices(swaggerObject, config.APINameSpace, config.ClientNameSpace);
 
             Console.WriteLine("> SERVICES (Quantity: " + services.Count + ")");
             Console.WriteLine("");

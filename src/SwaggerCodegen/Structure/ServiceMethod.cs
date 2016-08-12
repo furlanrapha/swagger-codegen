@@ -13,7 +13,7 @@ namespace SwaggerCodegen.Structure
         }
 
         public string Name { get; set; }
-        public string HttpVerb { get; set; }
+        public HttpVerb HttpVerb { get; set; }
         public string RouteUrl { get; set; }
 
         public Dictionary<string, string> Parameters { get; set; }

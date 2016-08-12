@@ -4,90 +4,134 @@ using SwaggerCodegen.SwaggerStructure;
 using System;
 using System.Collections.Generic;
 using System.Linq;
+using System.Net;
+using System.Net.Http;
 using System.Threading.Tasks;
 
 namespace SwaggerCodegen
 {
     public class SwaggerReader
     {
-        public static List<ServiceClass> ReadServices(JObject swaggerJsonFile)
+        public static List<ServiceClass> ReadServices(SwaggerObject swaggerObject, string apiNameSpace, string clientNameSpace)
         {
             List<ServiceClass> serviceList = new List<ServiceClass>();
 
-            foreach (var restService in swaggerJsonFile.SelectToken("paths").ToObject<JObject>())
+            foreach (var path in swaggerObject.paths)
             {
-                var restServiceHttpVerbs = restService.Value.ToObject<JObject>().Properties().Select(x => x.Name);
-
-                foreach (string restServiceHttpVerb in restServiceHttpVerbs)
+                if (path.Value.parameters != null)
                 {
-                    string nameOfClass = restService.Value.SelectToken(restServiceHttpVerb + ".tags").ToObject<List<string>>().FirstOrDefault();
+                    // TODO: Check what value comes
+                }
 
-                    string nameOfMethod = "MethodWithoutName";
+                if (path.Value.get != null)
+                {
+                    var serviceClass = GetOrGenerateServiceClass(ref serviceList, path.Value.get);
 
-                    // CHECK IF HAS THE NAME OF THE METHOD AND SPLIT THE INITIAL NAME OF THE CLASS FROM THE METHOD
-                    if (restService.Value.SelectToken(restServiceHttpVerb + ".operationId") != null)
-                        nameOfMethod = restService.Value.SelectToken(restServiceHttpVerb + ".operationId").ToObject<string>().Split('_')[1];
-                    else
-                        nameOfMethod = restService.Key.Split('/').LastOrDefault();
+                    AddServiceMethod(ref serviceClass, HttpVerb.GET, path.Key, path.Value.get, apiNameSpace, clientNameSpace);
+                }
 
-                    ServiceClass serviceClass;
+                if (path.Value.post != null)
+                {
+                    var serviceClass = GetOrGenerateServiceClass(ref serviceList, path.Value.post);
 
-                    if (!serviceList.Any(x => x.NameOfClass.Equals(nameOfClass)))
-                    {
-                        serviceClass = new ServiceClass();
+                    AddServiceMethod(ref serviceClass, HttpVerb.POST, path.Key, path.Value.post, apiNameSpace, clientNameSpace);
+                }
 
-                        serviceClass.NameOfClass = nameOfClass;
+                if (path.Value.put != null)
+                {
+                    var serviceClass = GetOrGenerateServiceClass(ref serviceList, path.Value.put);
 
-                        ServiceMethod serviceMethod = ReadServiceMethod(restService, restServiceHttpVerb, nameOfMethod);
+                    AddServiceMethod(ref serviceClass, HttpVerb.PUT, path.Key, path.Value.put, apiNameSpace, clientNameSpace);
+                }
 
-                        serviceClass.Methods.Add(serviceMethod);
+                if (path.Value.delete != null)
+                {
+                    var serviceClass = GetOrGenerateServiceClass(ref serviceList, path.Value.delete);
 
-                        serviceList.Add(serviceClass);
-                    }
-                    else
-                    {
-                        serviceClass = serviceList.SingleOrDefault(x => x.NameOfClass.Equals(nameOfClass));
+                    AddServiceMethod(ref serviceClass, HttpVerb.DELETE, path.Key, path.Value.delete, apiNameSpace, clientNameSpace);
+                }
 
-                        ServiceMethod serviceMethod = ReadServiceMethod(restService, restServiceHttpVerb, nameOfMethod);
+                if (path.Value.patch != null)
+                {
+                    var serviceClass = GetOrGenerateServiceClass(ref serviceList, path.Value.patch);
 
-                        serviceClass.Methods.Add(serviceMethod);
-                    }
+                    AddServiceMethod(ref serviceClass, HttpVerb.PATCH, path.Key, path.Value.patch, apiNameSpace, clientNameSpace);
+                }
+
+                if (path.Value.options != null)
+                {
+                    var serviceClass = GetOrGenerateServiceClass(ref serviceList, path.Value.options);
+
+                    AddServiceMethod(ref serviceClass, HttpVerb.OPTIONS, path.Key, path.Value.options, apiNameSpace, clientNameSpace);
+                }
+
+                if (path.Value.head != null)
+                {
+                    var serviceClass = GetOrGenerateServiceClass(ref serviceList, path.Value.head);
+
+                    AddServiceMethod(ref serviceClass, HttpVerb.HEAD, path.Key, path.Value.head, apiNameSpace, clientNameSpace);
                 }
             }
             
             return serviceList;
         }
 
-        private static ServiceMethod ReadServiceMethod(KeyValuePair<string, JToken> restService, string restServiceHttpVerb, string nameOfMethod)
+        private static ServiceClass GetOrGenerateServiceClass(ref List<ServiceClass> serviceList, SwaggerOperationObject swaggerOperationObject)
+        {
+            string className = swaggerOperationObject.tags[0];
+
+            ServiceClass serviceClass = serviceList.FirstOrDefault(x => x.NameOfClass.Equals(className));
+
+            if (serviceClass == null)
+            {
+                serviceClass = new ServiceClass();
+
+                serviceClass.NameOfClass = className;
+
+                serviceList.Add(serviceClass);
+            }
+
+            return serviceClass;
+        }
+
+        private static void AddServiceMethod(ref ServiceClass serviceClass, HttpVerb httpVerb, string routeUrl, SwaggerOperationObject swaggerOperationObject, string apiNameSpace, string clientNameSpace)
         {
             ServiceMethod serviceMethod = new ServiceMethod();
 
-            serviceMethod.Name = nameOfMethod;
-            serviceMethod.HttpVerb = restServiceHttpVerb.ToUpper();
-            serviceMethod.RouteUrl = restService.Key;
+            serviceMethod.Name = swaggerOperationObject.operationId;
+            serviceMethod.HttpVerb = httpVerb;
+            serviceMethod.RouteUrl = routeUrl;
 
-            if (restService.Value.SelectToken(restServiceHttpVerb + ".parameters") != null)
+            if (swaggerOperationObject.parameters != null)
             {
-                foreach (var jsonParameter in restService.Value.SelectToken(restServiceHttpVerb + ".parameters").ToList())
+                foreach (var parameter in swaggerOperationObject.parameters)
                 {
-                    SwaggerJSONParameter parameter = jsonParameter.ToObject<SwaggerJSONParameter>();
+                    string CSharpType;
 
-                    if (parameter.Type == null)
+                    if (parameter.type == null)
                     {
-                        string parameterRef = jsonParameter.SelectToken("schema.$ref").ToObject<string>();
+                        // Swagger works with JSON Pointer for $ref
+                        string jsonPointer = "#/definitions/";
 
-                        parameterRef = parameterRef.Replace("#/definitions/", "");
-
-                        serviceMethod.Parameters.Add(parameter.Name, parameterRef);
+                        CSharpType = TranslateNameSpace(parameter.schema._ref.Substring(jsonPointer.Length), apiNameSpace, clientNameSpace);
                     }
                     else
                     {
-                        serviceMethod.Parameters.Add(parameter.Name, parameter.Type);
+                        if (parameter.format == null)
+                        {
+                            CSharpType = parameter.type;
+                        }
+                        else
+                        {
+                            CSharpType = TranslateFormat(parameter.format);
+                        }
                     }
+
+                    serviceMethod.Parameters.Add(parameter.name, CSharpType);
                 }
             }
 
-            return serviceMethod;
+            serviceClass.Methods.Add(serviceMethod);
         }
 
         public static List<ViewModelClass> ReadViewModels(SwaggerObject swaggerObject, string apiNameSpace, string clientNameSpace)
