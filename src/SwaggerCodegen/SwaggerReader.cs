@@ -109,23 +109,12 @@ namespace SwaggerCodegen
             {
                 foreach (var parameter in swaggerOperationObject.parameters)
                 {
-                    string CSharpType;
-
-                    if (parameter.type == null)
-                    {
-                        CSharpType = TranslateJsonPointer(parameter.schema._ref, apiNameSpace, clientNameSpace);
-                    }
-                    else
-                    {
-                        if (parameter.format == null)
-                        {
-                            CSharpType = TranslateType(parameter.type, parameter.items, apiNameSpace, clientNameSpace);
-                        }
-                        else
-                        {
-                            CSharpType = TranslateFormat(parameter.format);
-                        }
-                    }
+                    string CSharpType = TranslateCSharpType(parameter.type,
+                                                            parameter.format,
+                                                            parameter.schema != null ? parameter.schema._ref : null,
+                                                            parameter.items,
+                                                            apiNameSpace,
+                                                            clientNameSpace);
 
                     serviceMethod.Parameters.Add(parameter.name, CSharpType);
                 }
@@ -146,23 +135,12 @@ namespace SwaggerCodegen
 
                 foreach (var property in definition.Value.properties)
                 {
-                    string CSharpType;
-                    
-                    if (property.Value.type == null)
-                    {
-                        CSharpType = TranslateJsonPointer(property.Value._ref, apiNameSpace, clientNameSpace);
-                    }
-                    else
-                    {
-                        if (property.Value.format == null)
-                        {
-                            CSharpType = TranslateType(property.Value.type, property.Value.items, apiNameSpace, clientNameSpace);
-                        }
-                        else
-                        {
-                            CSharpType = TranslateFormat(property.Value.format);
-                        }
-                    }
+                    string CSharpType = TranslateCSharpType(property.Value.type,
+                                                            property.Value.format,
+                                                            property.Value._ref,
+                                                            property.Value.items,
+                                                            apiNameSpace,
+                                                            clientNameSpace);
 
                     viewModelClass.Properties.Add(new ViewModelProperty
                     {
@@ -196,6 +174,29 @@ namespace SwaggerCodegen
             }
         }
 
+        private static string TranslateCSharpType(string type, string format, string _ref, SwaggerSchemaObject schema, string apiNameSpace, string clientNameSpace)
+        {
+            string CSharpType;
+
+            if (type == null)
+            {
+                CSharpType = TranslateJsonPointer(_ref, apiNameSpace, clientNameSpace);
+            }
+            else
+            {
+                if (format == null)
+                {
+                    CSharpType = TranslateType(type, schema, apiNameSpace, clientNameSpace);
+                }
+                else
+                {
+                    CSharpType = TranslateFormat(format);
+                }
+            }
+
+            return CSharpType;
+        }
+
         /// <summary>
         /// Translates the type from Swagger to a C# format
         /// </summary>
@@ -218,7 +219,9 @@ namespace SwaggerCodegen
             }
             else if (type.Equals("array"))
             {
-                return "List<" + TranslateJsonPointer(schema._ref, apiNameSpace, clientNameSpace) + ">";
+                string CSharpType = TranslateCSharpType(schema.type, schema.format, schema._ref, schema.items, apiNameSpace, clientNameSpace);
+
+                return "List<" + CSharpType + ">";
             }
             else
             {
