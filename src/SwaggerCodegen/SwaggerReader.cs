@@ -98,6 +98,9 @@ namespace SwaggerCodegen
         {
             ServiceMethod serviceMethod = new ServiceMethod();
 
+            if (string.IsNullOrEmpty(swaggerOperationObject.operationId))
+                return;
+
             serviceMethod.Name = swaggerOperationObject.operationId;
             serviceMethod.HttpVerb = httpVerb;
             serviceMethod.RouteUrl = routeUrl;
@@ -110,16 +113,13 @@ namespace SwaggerCodegen
 
                     if (parameter.type == null)
                     {
-                        // Swagger works with JSON Pointer for $ref
-                        string jsonPointer = "#/definitions/";
-
-                        CSharpType = TranslateNameSpace(parameter.schema._ref.Substring(jsonPointer.Length), apiNameSpace, clientNameSpace);
+                        CSharpType = TranslateJsonPointer(parameter.schema._ref, apiNameSpace, clientNameSpace);
                     }
                     else
                     {
                         if (parameter.format == null)
                         {
-                            CSharpType = parameter.type;
+                            CSharpType = TranslateType(parameter.type, parameter.items, apiNameSpace, clientNameSpace);
                         }
                         else
                         {
@@ -150,16 +150,13 @@ namespace SwaggerCodegen
                     
                     if (property.Value.type == null)
                     {
-                        // Swagger works with JSON Pointer for $ref
-                        string jsonPointer = "#/definitions/";
-
-                        CSharpType = TranslateNameSpace(property.Value._ref.Substring(jsonPointer.Length), apiNameSpace, clientNameSpace);
+                        CSharpType = TranslateJsonPointer(property.Value._ref, apiNameSpace, clientNameSpace);
                     }
                     else
                     {
                         if (property.Value.format == null)
                         {
-                            CSharpType = property.Value.type;
+                            CSharpType = TranslateType(property.Value.type, property.Value.items, apiNameSpace, clientNameSpace);
                         }
                         else
                         {
@@ -196,6 +193,36 @@ namespace SwaggerCodegen
             else
             {
                 return clientNameSpace + fullClassName.Substring(apiNameSpace.Length);
+            }
+        }
+
+        /// <summary>
+        /// Translates the type from Swagger to a C# format
+        /// </summary>
+        /// <param name="type">The type from Swagger</param>
+        /// <param name="schema">The schema from Swagger</param>
+        /// <returns>The C# format</returns>
+        private static string TranslateType(string type, SwaggerSchemaObject schema, string apiNameSpace, string clientNameSpace)
+        {
+            if (type.Equals("integer"))
+            {
+                return "long";
+            }
+            else if (type.Equals("number"))
+            {
+                return "double";
+            }
+            else if (type.Equals("boolean"))
+            {
+                return "bool";
+            }
+            else if (type.Equals("array"))
+            {
+                return "List<" + TranslateJsonPointer(schema._ref, apiNameSpace, clientNameSpace) + ">";
+            }
+            else
+            {
+                return type;
             }
         }
 
@@ -246,6 +273,19 @@ namespace SwaggerCodegen
             {
                 return "string";
             }
+        }
+
+        /// <summary>
+        /// Translates the $ref from Swagger to a C# format
+        /// </summary>
+        /// <param name="_ref">The $ref from Swagger</param>
+        /// <returns>The C# format</returns>
+        private static string TranslateJsonPointer(string _ref, string apiNameSpace, string clientNameSpace)
+        {
+            // Swagger works with JSON Pointer for $ref
+            string jsonPointer = "#/definitions/";
+
+            return TranslateNameSpace(_ref.Substring(jsonPointer.Length), apiNameSpace, clientNameSpace);
         }
     }
 }
