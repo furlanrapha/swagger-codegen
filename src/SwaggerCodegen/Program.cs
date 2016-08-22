@@ -1,5 +1,6 @@
 ﻿using Newtonsoft.Json;
 using Newtonsoft.Json.Linq;
+using SwaggerCodegen.Structure;
 using SwaggerCodegen.SwaggerStructure;
 using System;
 using System.Collections.Generic;
@@ -14,23 +15,66 @@ namespace SwaggerCodegen
     {
         static void Main(string[] args)
         {
-            ConfigurationData config = new ConfigurationData()
+            string configFileName = "config.json";
+            
+            if (!File.Exists(configFileName))
             {
-                APIUrl = "http://kondominio-api.gear.host/swagger/docs/v1",
-                APINameSpace = "Kondominio",
-                ClientNameSpace = "Kondominio.Web.API",
-                FolderPath = @"C:\TEMP_SWAGGER\"
-            };
+                var streamWriter = File.CreateText(configFileName);
+
+                // Unload the file
+                streamWriter.Dispose();
+            }
+
+            var configFile = File.OpenText(configFileName);
+
+            ConfigurationData config = JsonConvert.DeserializeObject<ConfigurationData>(configFile.ReadToEnd());
+
+            // Unload the file
+            configFile.Dispose();
+
+            if (config == null)
+            {
+                config = new ConfigurationData()
+                {
+                    APIUrl = "",
+                    APISwaggerUrl = "",
+                    APINameSpace = "",
+                    ClientNameSpace = "",
+                    FolderPath = ""
+                };
+            }
+            else
+            {
+                Console.WriteLine("--- DETECTED A CONFIGURATION FILE IN THE SYSTEM");
+
+                Console.WriteLine("> API URL: " + config.APIUrl);
+
+                Console.WriteLine("> API URL FROM SWAGGER FILE: " + config.APISwaggerUrl);
+
+                Console.WriteLine("> API NAMESPACE: " + config.APINameSpace);
+
+                Console.WriteLine("> CLIENT NAMESPACE: " + config.ClientNameSpace);
+
+                Console.WriteLine("> FOLDER: " + config.FolderPath);
+
+                Console.WriteLine();
+            }
 
             Console.WriteLine("--- GETTING THE CONFIGURATION FROM THE USER");
 
             string inputFromUser = "";
 
-            Console.WriteLine("> ENTER THE API URL: (EXAMPLE: \"http://api.yourwebsite.com/swagger/docs/v1\")");
+            Console.WriteLine("> ENTER THE API URL: (EXAMPLE: \"http://api.yourwebsite.com/\")");
             inputFromUser = Console.ReadLine();
 
             if (!string.IsNullOrWhiteSpace(inputFromUser))
                 config.APIUrl = inputFromUser;
+
+            Console.WriteLine("> ENTER THE API URL FROM SWAGGER FILE: (EXAMPLE: \"http://api.yourwebsite.com/swagger/docs/v1\")");
+            inputFromUser = Console.ReadLine();
+
+            if (!string.IsNullOrWhiteSpace(inputFromUser))
+                config.APISwaggerUrl = inputFromUser;
 
             Console.WriteLine("> ENTER THE API NAMESPACE: (EXAMPLE: \"ExampleNameSpace\")");
             inputFromUser = Console.ReadLine();
@@ -50,12 +94,16 @@ namespace SwaggerCodegen
             if (!string.IsNullOrWhiteSpace(inputFromUser))
                 config.FolderPath = inputFromUser;
 
+            if (!config.FolderPath.EndsWith("\\"))
+                config.FolderPath = config.FolderPath + "\\";
+
+            File.WriteAllText(configFileName, JsonConvert.SerializeObject(config));
+
             Console.WriteLine("--- CONFIGURATION INSERTED");
-            Console.WriteLine(config.ToString());
 
             Console.WriteLine("--- GETTING THE JSON FILE FROM SWAGGER");
 
-            SwaggerObject swaggerObject = GetSwaggerObject(config.APIUrl);
+            SwaggerObject swaggerObject = GetSwaggerObject(config.APISwaggerUrl);
 
             Console.WriteLine("- JSON File Loaded");
 
@@ -97,6 +145,9 @@ namespace SwaggerCodegen
 
             Console.ReadLine();
 
+            Infrastructure infrastructure = new Infrastructure();
+            infrastructure.AdditionalHeaderParameters = SwaggerReader.ReadAdditionalHeaders(swaggerObject);
+
             executionDateTime = DateTime.Now;
 
             ConfigureFolder(config.FolderPath);
@@ -104,7 +155,7 @@ namespace SwaggerCodegen
             Console.WriteLine("> CREATING THE SERVICES FILES");
             Console.WriteLine("");
 
-            SwaggerWriter.WriteServices(services, config.APINameSpace, config.ClientNameSpace, config.FolderPath);
+            SwaggerWriter.WriteServices(services, infrastructure, config.APIUrl, config.APINameSpace, config.ClientNameSpace, config.FolderPath);
 
             Console.WriteLine("");
             Console.WriteLine("> CREATING THE VIEW MODELS FILES");

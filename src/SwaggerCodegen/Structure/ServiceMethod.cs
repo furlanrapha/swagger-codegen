@@ -16,6 +16,8 @@ namespace SwaggerCodegen.Structure
         public HttpVerb HttpVerb { get; set; }
         public string RouteUrl { get; set; }
 
+        public string Returns { get; set; }
+
         public Dictionary<string, string> Parameters { get; set; }
     }
 }

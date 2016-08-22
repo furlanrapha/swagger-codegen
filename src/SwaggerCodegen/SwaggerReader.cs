@@ -72,7 +72,7 @@ namespace SwaggerCodegen
                     AddServiceMethod(ref serviceClass, HttpVerb.HEAD, path.Key, path.Value.head, apiNameSpace, clientNameSpace);
                 }
             }
-            
+
             return serviceList;
         }
 
@@ -105,6 +105,22 @@ namespace SwaggerCodegen
             serviceMethod.HttpVerb = httpVerb;
             serviceMethod.RouteUrl = routeUrl;
 
+            var swaggerResponseObject = swaggerOperationObject.responses.FirstOrDefault(x => x.Key.Equals("200"));
+
+            // Add the return object
+            if (swaggerResponseObject.Value != null)
+            {
+                if (swaggerResponseObject.Value.schema != null)
+                {
+                    serviceMethod.Returns = TranslateCSharpType(swaggerResponseObject.Value.schema.type,
+                                                                swaggerResponseObject.Value.schema.format,
+                                                                swaggerResponseObject.Value.schema._ref,
+                                                                swaggerResponseObject.Value.schema.items,
+                                                                apiNameSpace,
+                                                                clientNameSpace);
+                }
+            }
+
             if (swaggerOperationObject.parameters != null)
             {
                 foreach (var parameter in swaggerOperationObject.parameters)
@@ -116,7 +132,7 @@ namespace SwaggerCodegen
                                                             apiNameSpace,
                                                             clientNameSpace);
 
-                    serviceMethod.Parameters.Add(parameter.name, CSharpType);
+                    serviceMethod.Parameters.Add(parameter.name.Replace(".", "_"), CSharpType);
                 }
             }
 
@@ -130,29 +146,78 @@ namespace SwaggerCodegen
             foreach (var definition in swaggerObject.definitions)
             {
                 ViewModelClass viewModelClass = new ViewModelClass();
-                
+
                 viewModelClass.NameOfClass = TranslateNameSpace(definition.Key, apiNameSpace, clientNameSpace);
 
                 foreach (var property in definition.Value.properties)
                 {
-                    string CSharpType = TranslateCSharpType(property.Value.type,
+                    if (!string.IsNullOrEmpty(property.Value.type) &&
+                        property.Value.type.Equals("object"))
+                    {
+                        // INNER VIEW MODEL CLASS DETECTED
+                        ViewModelClass innerViewModelClass = new ViewModelClass();
+
+                        string nameOfClassAdjusted = definition.Key + char.ToUpper(property.Key[0]) + property.Key.Substring(1);
+
+                        innerViewModelClass.NameOfClass = TranslateNameSpace(nameOfClassAdjusted, apiNameSpace, clientNameSpace);
+
+                        foreach (var innerProperty in property.Value.properties)
+                        {
+                            string CSharpType = TranslateCSharpType(innerProperty.Value.type,
+                                                                    innerProperty.Value.format,
+                                                                    innerProperty.Value._ref,
+                                                                    innerProperty.Value.items,
+                                                                    apiNameSpace,
+                                                                    clientNameSpace);
+
+                            innerViewModelClass.Properties.Add(new ViewModelProperty
+                            {
+                                Name = innerProperty.Key,
+                                Type = CSharpType
+                            });
+                        }
+
+                        viewModelList.Add(innerViewModelClass);
+
+                        viewModelClass.Properties.Add(new ViewModelProperty
+                        {
+                            Name = property.Key,
+                            Type = innerViewModelClass.NameOfClass
+                        });
+                    }
+                    else
+                    {
+                        string CSharpType = TranslateCSharpType(property.Value.type,
                                                             property.Value.format,
                                                             property.Value._ref,
                                                             property.Value.items,
                                                             apiNameSpace,
                                                             clientNameSpace);
 
-                    viewModelClass.Properties.Add(new ViewModelProperty
-                    {
-                        Name = property.Key,
-                        Type = CSharpType
-                    });
+                        viewModelClass.Properties.Add(new ViewModelProperty
+                        {
+                            Name = property.Key,
+                            Type = CSharpType
+                        });
+                    }
                 }
 
                 viewModelList.Add(viewModelClass);
             }
 
             return viewModelList;
+        }
+
+        public static List<string> ReadAdditionalHeaders(SwaggerObject swaggerObject)
+        {
+            List<string> list = new List<string>();
+
+            foreach (var secutiryDefinitions in swaggerObject.securityDefinitions)
+            {
+                list.Add(secutiryDefinitions.Value.name);
+            }
+
+            return list;
         }
 
         /// <summary>
@@ -170,7 +235,14 @@ namespace SwaggerCodegen
             }
             else
             {
-                return clientNameSpace + fullClassName.Substring(apiNameSpace.Length);
+                if (string.IsNullOrEmpty(apiNameSpace))
+                {
+                    return clientNameSpace + ".ViewModel." + fullClassName;
+                }
+                else
+                {
+                    return clientNameSpace + fullClassName.Substring(apiNameSpace.Length);
+                }
             }
         }
 
@@ -202,6 +274,8 @@ namespace SwaggerCodegen
         /// </summary>
         /// <param name="type">The type from Swagger</param>
         /// <param name="schema">The schema from Swagger</param>
+        /// <param name="apiNameSpace">The API namespace</param>
+        /// <param name="clientNameSpace">The Client namespace</param>
         /// <returns>The C# format</returns>
         private static string TranslateType(string type, SwaggerSchemaObject schema, string apiNameSpace, string clientNameSpace)
         {
@@ -282,6 +356,8 @@ namespace SwaggerCodegen
         /// Translates the $ref from Swagger to a C# format
         /// </summary>
         /// <param name="_ref">The $ref from Swagger</param>
+        /// <param name="apiNameSpace">The API namespace</param>
+        /// <param name="clientNameSpace">The Client namespace</param>
         /// <returns>The C# format</returns>
         private static string TranslateJsonPointer(string _ref, string apiNameSpace, string clientNameSpace)
         {
