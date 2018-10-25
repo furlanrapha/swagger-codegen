@@ -23,7 +23,7 @@ namespace SwaggerCodegen.SwaggerStructure
 
         public bool allowEmptyValue { get; set; }
         public string collectionFormat { get; set; }
-        
+
         public float maximum { get; set; }
         public bool exclusiveMaximum { get; set; }
         public float minimum { get; set; }
@@ -42,5 +42,7 @@ namespace SwaggerCodegen.SwaggerStructure
         public Dictionary<string, SwaggerSchemaObject> allOf { get; set; }
         public Dictionary<string, SwaggerSchemaObject> properties { get; set; }
         public SwaggerSchemaObject additionalProperties { get; set; }
+
+        public Dictionary<string, string> xml { get; set; }
     }
 }
